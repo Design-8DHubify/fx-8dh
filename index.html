@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>8DHUBIFY | ASCII Studio v15.0 (Camera Orbit)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <meta name="robots" content="noindex, nofollow">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
+
+    <style>
+        :root {
+            --accent: #6633FF;
+            --accent-hover: #5222db;
+            --bg-interface: #111114;
+            --bg-canvas-preview: #FBF8EF; 
+            --border: rgba(255, 255, 255, 0.08);
+            --text-dim: #a1a1aa;
+        }
+
+        * { box-sizing: border-box; outline: none; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0a0a0c;
+            color: white;
+            margin: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        aside {
+            width: 360px;
+            background: var(--bg-interface);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            z-index: 10;
+        }
+
+        .header-area { padding: 25px 25px 0 25px; }
+        .logo { font-weight: 800; font-size: 1.4rem; color: var(--accent); margin-bottom: 20px; letter-spacing: -1px; }
+        .logo span { color: white; font-weight: 400; }
+
+        .tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+        .tab-btn {
+            flex: 1; padding: 12px; background: transparent; border: none; color: var(--text-dim);
+            font-weight: 700; cursor: pointer; border-bottom: 2px solid transparent; transition: 0.2s;
+        }
+        .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+        .tab-content { display: none; padding: 0 25px; }
+        .tab-content.active { display: block; }
+
+        .divider { height: 1px; background: var(--border); margin: 15px 25px; }
+
+        .global-controls { padding: 0 25px; }
+
+        .group { margin-bottom: 20px; }
+        label {
+            display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-dim);
+            margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700;
+        }
+        label span { color: var(--accent); font-family: 'Space Mono', monospace; }
+
+        input[type="range"] { width: 100%; appearance: none; height: 3px; background: #333; border-radius: 5px; cursor: pointer; }
+        input[type="range"]::-webkit-slider-thumb { appearance: none; width: 15px; height: 15px; background: var(--accent); border-radius: 50%; }
+
+        .upload-row { display: flex; gap: 10px; margin-bottom: 20px; }
+        .upload-area {
+            flex: 1; border: 2px dashed #444; padding: 15px 10px; border-radius: 10px;
+            text-align: center; cursor: pointer; transition: 0.3s;
+        }
+        .upload-area.full-width { margin-bottom: 10px; padding: 20px; }
+        .upload-area:hover { border-color: var(--accent); background: rgba(102,51,255,0.05); }
+        .upload-area p { margin: 0; font-size: 0.75rem; font-weight: bold; }
+
+        .color-picker { display: flex; gap: 10px; padding: 0 25px; margin-bottom: 20px; }
+        .color-opt { 
+            flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #333; 
+            text-align: center; font-size: 0.8rem; cursor: pointer; font-weight: bold;
+        }
+        .color-opt.active { border-color: var(--accent); background: rgba(102,51,255,0.15); }
+
+        .actions { margin-top: auto; display: flex; flex-direction: column; gap: 10px; padding: 0 25px 25px 25px; }
+        button { padding: 15px; border-radius: 8px; border: none; font-weight: 700; cursor: pointer; transition: 0.2s; font-size: 0.85rem; }
+        .btn-png { background: var(--accent); color: white; }
+        .btn-png:hover { background: var(--accent-hover); }
+        .btn-svg { background: transparent; color: white; border: 1px solid #444; }
+        .btn-svg:hover { border-color: #666; }
+        .btn-json { background: #Eab308; color: #000; }
+        .btn-json:hover { background: #ca8a04; }
+        
+        .btn-shadow-toggle {
+            background: transparent; color: white; border: 1px solid #444; width: 100%; margin-bottom: 20px;
+        }
+
+        main {
+            flex-grow: 1; display: flex; align-items: center; justify-content: center;
+            background: var(--bg-canvas-preview); padding: 40px; overflow: hidden; position: relative;
+        }
+        
+        #mainCanvas { max-width: 100%; max-height: 100%; object-fit: contain; }
+        #hidden3DCanvas { display: none; }
+
+        #loading {
+            position: absolute; background: rgba(0,0,0,0.8); color: white;
+            padding: 10px 20px; border-radius: 20px; top: 20px; right: 20px; display: none; z-index: 100;
+        }
+
+        /* --- ESTILO DO CONTROLE DE LUZ INTERATIVO --- */
+        #lightControl {
+            position: absolute; font-size: 32px; cursor: grab; user-select: none;
+            z-index: 50; top: 25%; left: 75%; transform: translate(-50%, -50%);
+            filter: drop-shadow(0 0 15px rgba(255, 200, 0, 0.8)); display: none; transition: transform 0.1s;
+        }
+        #lightControl:active { cursor: grabbing; transform: translate(-50%, -50%) scale(1.3); }
+        
+        .instruction-box {
+            background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+            padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 0.8rem;
+            color: var(--text-dim); text-align: center;
+        }
+        .instruction-box strong { color: var(--accent); }
+    </style>
+</head>
+<body>
+
+    <aside>
+        <div class="header-area">
+            <div class="logo">8DHUBIFY <span>Studio</span></div>
+            <div class="tabs">
+                <button class="tab-btn active" onclick="switchTab('2d')">2D (Imagem)</button>
+                <button class="tab-btn" onclick="switchTab('3d')">3D (.obj)</button>
+            </div>
+        </div>
+
+        <div id="tab-2d" class="tab-content active">
+            <div class="upload-area full-width" onclick="document.getElementById('imgIn').click()">
+                <p>Carregar PNG/JPG</p>
+                <input type="file" id="imgIn" accept="image/*" hidden>
+            </div>
+        </div>
+
+        <div id="tab-3d" class="tab-content">
+            <div class="upload-row">
+                <div class="upload-area" onclick="document.getElementById('objIn').click()">
+                    <p>Carregar .obj</p>
+                    <input type="file" id="objIn" accept=".obj" hidden>
+                </div>
+                <div class="upload-area" onclick="document.getElementById('hdriIn').click()" style="border-color: #6633FF;">
+                    <p>Carregar HDRI</p>
+                    <input type="file" id="hdriIn" accept="image/*" hidden>
+                </div>
+            </div>
+
+            <div class="instruction-box">
+                O HDRI é invisível na exportação.<br>Arraste a <strong>💡</strong> para direcionar a luz focal.
+            </div>
+
+            <button id="btnToggleShadow" class="btn-shadow-toggle" onclick="toggleFloorShadow()">Ativar Sombra Chão</button>
+
+            <div class="group"><label>Órbita Câmera (Vertical) <span id="rotXV">0°</span></label><input type="range" id="rotX" min="-90" max="90" value="0"></div>
+            <div class="group"><label>Órbita Câmera (Horizontal) <span id="rotYV">0°</span></label><input type="range" id="rotY" min="0" max="360" value="0"></div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="global-controls">
+            <div class="group"><label>Resolução Horizontal <span id="resV">100</span></label><input type="range" id="res" min="40" max="300" value="100"></div>
+            <div class="group"><label>Tamanho da Letra <span id="fontV">20px</span></label><input type="range" id="fontSize" min="20" max="60" value="20"></div>
+            <div class="group"><label>Nível de Preto <span id="blackV">20%</span></label><input type="range" id="black" min="0" max="100" value="20"></div>
+            <div class="group"><label>Contorno <span id="contourV">45%</span></label><input type="range" id="contour" min="0" max="100" value="45"></div>
+            <div class="group"><label>Branco <span id="whiteV">95%</span></label><input type="range" id="white" min="50" max="100" value="95"></div>
+        </div>
+
+        <div class="color-picker">
+            <div class="color-opt active" onclick="setColor('#6633FF', this)">#6633FF</div>
+            <div class="color-opt" onclick="setColor('#000000', this)">Preto</div>
+        </div>
+
+        <div class="actions">
+            <button class="btn-png" onclick="exportPNG()">Exportar PNG (2x Qualidade)</button>
+            <button class="btn-svg" onclick="exportSVG()">Exportar SVG (Texto)</button>
+            <button id="btnJson" class="btn-json" style="display: none;" onclick="exportJSONAnim()">Exportar Animação JSON</button>
+        </div>
+    </aside>
+
+    <main id="mainArea">
+        <div id="loading">Processando...</div>
+        <div id="lightControl" title="Arraste para mover a luz">💡</div>
+        <canvas id="mainCanvas"></canvas>
+        <canvas id="hidden3DCanvas"></canvas>
+    </main>
+
+    <script>
+        const canvas = document.getElementById('mainCanvas');
+        const ctx = canvas.getContext('2d');
+        const loading = document.getElementById('loading');
+        
+        let currentMode = '2d';
+        let img2D = null;
+        let activeColor = "#6633FF";
+        let lastSvg = "";
+
+        // --- SISTEMA 3D ---
+        let scene, camera, renderer, currentObj, directionalLight;
+        let cameraPivot; // NOVO: Pivô que controlará a rotação da câmera
+        let is3DReady = false;
+        let showFloorShadow = false;
+        let floorPlane = null;
+
+        init3DSystem();
+
+        function switchTab(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            document.querySelector(`.tab-btn[onclick="switchTab('${mode}')"]`).classList.add('active');
+            document.getElementById(`tab-${mode}`).classList.add('active');
+            
+            document.getElementById('btnJson').style.display = mode === '3d' ? 'block' : 'none';
+            document.getElementById('lightControl').style.display = mode === '3d' ? 'block' : 'none';
+            
+            render();
+        }
+
+        // --- LÓGICA DE ARRASTAR A LUZ (💡) ---
+        const lightControl = document.getElementById('lightControl');
+        const mainArea = document.getElementById('mainArea');
+        let isDraggingLight = false;
+
+        lightControl.addEventListener('mousedown', () => isDraggingLight = true);
+        lightControl.addEventListener('touchstart', (e) => { e.preventDefault(); isDraggingLight = true; }, {passive: false});
+        window.addEventListener('mouseup', () => isDraggingLight = false);
+        window.addEventListener('touchend', () => isDraggingLight = false);
+
+        function handleLightMove(clientX, clientY) {
+            if (!isDraggingLight || !is3DReady) return;
+            const rect = mainArea.getBoundingClientRect();
+            let x = Math.max(20, Math.min(clientX - rect.left, rect.width - 20));
+            let y = Math.max(20, Math.min(clientY - rect.top, rect.height - 20));
+
+            lightControl.style.left = x + 'px';
+            lightControl.style.top = y + 'px';
+
+            const lx = ((x / rect.width) * 2 - 1) * 100;
+            const ly = -((y / rect.height) * 2 - 1) * 100; 
+            directionalLight.position.set(lx, ly, 100);
+            
+            renderer.render(scene, camera);
+            clearTimeout(window.rT);
+            window.rT = setTimeout(render, 30);
+        }
+
+        window.addEventListener('mousemove', (e) => handleLightMove(e.clientX, e.clientY));
+        window.addEventListener('touchmove', (e) => {
+            if(isDraggingLight) { e.preventDefault(); handleLightMove(e.touches[0].clientX, e.touches[0].clientY); }
+        }, {passive: false});
+
+        const inputsGlobais = ['res', 'fontSize', 'black', 'contour', 'white'];
+        const inputs3D = ['rotX', 'rotY'];
+        
+        [...inputsGlobais, ...inputs3D].forEach(id => document.getElementById(id).oninput = () => {
+            updateLabels();
+            if(currentMode === '3d' && inputs3D.includes(id)) update3DScene();
+            clearTimeout(window.rT);
+            window.rT = setTimeout(render, 50);
+        });
+
+        document.getElementById('imgIn').onchange = e => {
+            const file = e.target.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = ev => { img2D = new Image(); img2D.onload = () => { switchTab('2d'); render(); }; img2D.src = ev.target.result; };
+            reader.readAsDataURL(file);
+        };
+
+        document.getElementById('objIn').onchange = e => {
+            const file = e.target.files[0];
+            if(!file) return;
+            loading.style.display = 'block';
+            
+            const reader = new FileReader();
+            reader.onload = ev => {
+                const contents = ev.target.result;
+                const loader = new THREE.OBJLoader();
+                const object = loader.parse(contents);
+                
+                if (currentObj) scene.remove(currentObj);
+                if (floorPlane) scene.remove(floorPlane); 
+                floorPlane = null;
+                showFloorShadow = false;
+                document.getElementById('btnToggleShadow').textContent = "Ativar Sombra Chão";
+                
+                // Zera os controles da câmera
+                cameraPivot.rotation.set(0, 0, 0);
+                document.getElementById('rotX').value = 0;
+                document.getElementById('rotY').value = 0;
+                updateLabels();
+                
+                const material = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, roughness: 0.4, metalness: 0.6 });
+                object.traverse(function (child) { 
+                    if (child.isMesh) {
+                        child.material = material;
+                        child.castShadow = true; 
+                    } 
+                });
+
+                const box = new THREE.Box3().setFromObject(object);
+                const size = box.getSize(new THREE.Vector3()).length();
+                const center = box.getCenter(new THREE.Vector3());
+                
+                object.position.x += (object.position.x - center.x);
+                object.position.y += (object.position.y - center.y);
+                object.position.z += (object.position.z - center.z);
+                
+                // Distância da câmera no eixo Z do Pivô
+                camera.position.set(0, 0, size * 1.5);
+                camera.lookAt(0, 0, 0);
+
+                currentObj = object;
+                scene.add(currentObj);
+                is3DReady = true;
+                
+                update3DScene();
+                switchTab('3d');
+                render();
+                loading.style.display = 'none';
+            };
+            reader.readAsText(file);
+        };
+
+        document.getElementById('hdriIn').onchange = e => {
+            const file = e.target.files[0];
+            if(!file) return;
+            loading.innerText = 'Carregando HDRI...';
+            loading.style.display = 'block';
+
+            const reader = new FileReader();
+            reader.onload = ev => {
+                const textureLoader = new THREE.TextureLoader();
+                textureLoader.load(ev.target.result, (texture) => {
+                    texture.mapping = THREE.EquirectangularReflectionMapping;
+                    scene.environment = texture;
+                    
+                    update3DScene();
+                    render();
+                    loading.style.display = 'none';
+                    loading.innerText = 'Processando...';
+                });
+            };
+            reader.readAsDataURL(file);
+        };
+
+        function toggleFloorShadow() {
+            if (!is3DReady) return;
+            showFloorShadow = !showFloorShadow;
+            
+            const btn = document.getElementById('btnToggleShadow');
+
+            if (showFloorShadow) {
+                if (!floorPlane) {
+                    const geometry = new THREE.PlaneGeometry(200, 200);
+                    const material = new THREE.ShadowMaterial({ opacity: 0.3 }); 
+                    floorPlane = new THREE.Mesh(geometry, material);
+                    floorPlane.rotation.x = -Math.PI / 2;
+                    floorPlane.receiveShadow = true; 
+                    scene.add(floorPlane);
+                }
+                
+                const box = new THREE.Box3().setFromObject(currentObj);
+                floorPlane.position.y = box.min.y - 0.1;
+                floorPlane.visible = true;
+                
+                btn.textContent = "Desativar Sombra Chão";
+                btn.style.borderColor = "var(--accent)";
+                btn.style.color = "var(--accent)";
+            } else {
+                if (floorPlane) floorPlane.visible = false;
+                btn.textContent = "Ativar Sombra Chão";
+                btn.style.borderColor = "#444";
+                btn.style.color = "white";
+            }
+            
+            renderer.render(scene, camera);
+            render(); 
+        }
+
+        function init3DSystem() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xffffff); 
+            
+            // NOVO: Grupo pivô que segura a câmera. Girar ele fará a câmera orbitar.
+            cameraPivot = new THREE.Group();
+            scene.add(cameraPivot);
+
+            camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
+            cameraPivot.add(camera);
+            
+            directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
+            directionalLight.position.set(50, 50, 100);
+            directionalLight.castShadow = true; 
+            
+            directionalLight.shadow.mapSize.width = 2048; 
+            directionalLight.shadow.mapSize.height = 2048;
+            directionalLight.shadow.camera.near = 0.5;
+            directionalLight.shadow.camera.far = 500;
+            directionalLight.shadow.camera.left = -100;
+            directionalLight.shadow.camera.right = 100;
+            directionalLight.shadow.camera.top = 100;
+            directionalLight.shadow.camera.bottom = -100;
+            directionalLight.shadow.bias = -0.0005; 
+            
+            scene.add(directionalLight);
+            
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.3); 
+            scene.add(ambientLight);
+
+            renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('hidden3DCanvas'), preserveDrawingBuffer: true, antialias: true });
+            renderer.setSize(800, 800);
+            renderer.shadowMap.enabled = true; 
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap; 
+        }
+
+        function update3DScene() {
+            if(!is3DReady) return;
+            const rx = document.getElementById('rotX').value * (Math.PI / 180);
+            const ry = document.getElementById('rotY').value * (Math.PI / 180);
+            
+            // A rotação agora acontece no pivô da câmera, orbitando o objeto
+            cameraPivot.rotation.set(rx, ry, 0);
+            
+            renderer.render(scene, camera);
+        }
+
+        function setColor(c, el) {
+            activeColor = c;
+            document.querySelectorAll('.color-opt').forEach(o => o.classList.remove('active'));
+            el.classList.add('active');
+            render();
+        }
+
+        function updateLabels() {
+            document.getElementById('resV').innerText = document.getElementById('res').value;
+            document.getElementById('fontV').innerText = document.getElementById('fontSize').value + 'px';
+            document.getElementById('blackV').innerText = document.getElementById('black').value + '%';
+            document.getElementById('contourV').innerText = document.getElementById('contour').value + '%';
+            document.getElementById('whiteV').innerText = document.getElementById('white').value + '%';
+            document.getElementById('rotXV').innerText = document.getElementById('rotX').value + '°';
+            document.getElementById('rotYV').innerText = document.getElementById('rotY').value + '°';
+        }
+
+        function getActiveImage() {
+            if(currentMode === '2d') return img2D;
+            if(currentMode === '3d' && is3DReady) return document.getElementById('hidden3DCanvas');
+            return null;
+        }
+
+        function generateASCIIMatrix() {
+            const sourceImg = getActiveImage();
+            if(!sourceImg) return null;
+
+            const resH = parseInt(document.getElementById('res').value);
+            const fSize = parseInt(document.getElementById('fontSize').value);
+            const bLvl = parseInt(document.getElementById('black').value) * 2.55;
+            const cLvl = parseInt(document.getElementById('contour').value) * 2.55;
+            const wLvl = parseInt(document.getElementById('white').value) * 2.55;
+            const pattern = "8DHUBIFY";
+
+            const charW = fSize * 0.6;
+            const charH = fSize;
+
+            let ratio = currentMode === '3d' ? 1 : sourceImg.height / sourceImg.width;
+            const w = resH;
+            const h = Math.floor(resH * ratio * 0.6); 
+
+            const tCanv = document.createElement('canvas');
+            tCanv.width = w; tCanv.height = h;
+            const tCtx = tCanv.getContext('2d');
+            tCtx.drawImage(sourceImg, 0, 0, w, h);
+            const pix = tCtx.getImageData(0, 0, w, h).data;
+
+            let matrix = [];
+            let charIdx = 0;
+
+            for (let y = 0; y < h; y++) {
+                let row = [];
+                for (let x = 0; x < w; x++) {
+                    const i = (y * w + x) * 4;
+                    const bright = pix[i] * 0.299 + pix[i+1] * 0.587 + pix[i+2] * 0.114;
+                    
+                    if (pix[i+3] < 50 || bright > wLvl) {
+                        row.push(null); 
+                        continue;
+                    }
+
+                    let char = "";
+                    let isBold = false;
+                    
+                    if (bright < bLvl) { char = "█"; isBold = true; }
+                    else if (bright < cLvl) { char = "✦"; }
+                    else {
+                        char = pattern[charIdx % pattern.length];
+                        charIdx++;
+                        if (bright < (wLvl + cLvl)/2) isBold = true;
+                    }
+                    row.push({ char, isBold });
+                }
+                matrix.push(row);
+            }
+            return { matrix, w, h, charW, charH, fSize };
+        }
+
+        function render() {
+            const data = generateASCIIMatrix();
+            if(!data) return;
+
+            canvas.width = data.w * data.charW;
+            canvas.height = data.h * data.charH;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.textBaseline = 'top';
+
+            lastSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width * 2}" height="${canvas.height * 2}" viewBox="0 0 ${canvas.width} ${canvas.height}">\n`;
+            lastSvg += `<style>@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&amp;display=swap'); text { font-family: 'Space Mono', monospace; }</style>\n`;
+
+            for (let y = 0; y < data.h; y++) {
+                for (let x = 0; x < data.w; x++) {
+                    const cell = data.matrix[y][x];
+                    if(!cell) continue;
+
+                    ctx.font = `${cell.isBold ? '700' : '400'} ${data.fSize}px 'Space Mono', monospace`;
+                    ctx.fillStyle = activeColor;
+                    ctx.fillText(cell.char, x * data.charW, y * data.charH);
+
+                    const safeChar = cell.char === '█' ? '&#9608;' : (cell.char === '✦' ? '&#10022;' : cell.char);
+                    lastSvg += `<text x="${(x * data.charW).toFixed(2)}" y="${(y * data.charH + data.fSize * 0.8).toFixed(2)}" font-weight="${cell.isBold ? '700' : '400'}" font-size="${data.fSize}px" fill="${activeColor}">${safeChar}</text>\n`;
+                }
+            }
+            lastSvg += `</svg>`;
+        }
+
+        function exportPNG() {
+            const data = generateASCIIMatrix();
+            if(!data) return;
+
+            loading.innerText = 'Gerando Alta Qualidade 2x...';
+            loading.style.display = 'block';
+
+            setTimeout(() => {
+                const expCanv = document.createElement('canvas');
+                expCanv.width = (data.w * data.charW) * 2;
+                expCanv.height = (data.h * data.charH) * 2;
+                const expCtx = expCanv.getContext('2d');
+                
+                expCtx.scale(2, 2);
+                expCtx.textBaseline = 'top';
+
+                for (let y = 0; y < data.h; y++) {
+                    for (let x = 0; x < data.w; x++) {
+                        const cell = data.matrix[y][x];
+                        if(!cell) continue;
+                        expCtx.font = `${cell.isBold ? '700' : '400'} ${data.fSize}px 'Space Mono', monospace`;
+                        expCtx.fillStyle = activeColor;
+                        expCtx.fillText(cell.char, x * data.charW, y * data.charH);
+                    }
+                }
+
+                const link = document.createElement('a');
+                link.download = '8DHUBIFY_2x.png';
+                link.href = expCanv.toDataURL('image/png', 1.0);
+                link.click();
+                loading.style.display = 'none';
+                loading.innerText = 'Processando...';
+            }, 100);
+        }
+
+        function exportSVG() {
+            if(!lastSvg) return;
+            const blob = new Blob([lastSvg], {type: 'image/svg+xml;charset=utf-8'});
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = '8DHUBIFY_Texto.svg';
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function exportJSONAnim() {
+            if(!is3DReady) return alert("Carregue um modelo 3D primeiro!");
+            
+            loading.innerText = 'Renderizando Animação (36 Frames)...';
+            loading.style.display = 'block';
+
+            setTimeout(() => {
+                const totalFrames = 36; 
+                const originalRotY = cameraPivot.rotation.y;
+                let framesData = [];
+
+                for(let f = 0; f < totalFrames; f++) {
+                    // A animação agora também gira o pivô da câmera!
+                    cameraPivot.rotation.y = (f * 10) * (Math.PI / 180);
+                    renderer.render(scene, camera);
+                    
+                    const data = generateASCIIMatrix();
+                    let stringFrame = [];
+                    
+                    for (let y = 0; y < data.h; y++) {
+                        let rowStr = "";
+                        for (let x = 0; x < data.w; x++) {
+                            const cell = data.matrix[y][x];
+                            rowStr += cell ? cell.char : " ";
+                        }
+                        stringFrame.push(rowStr);
+                    }
+                    framesData.push(stringFrame);
+                }
+
+                cameraPivot.rotation.y = originalRotY;
+                renderer.render(scene, camera);
+
+                const exportObj = {
+                    metadata: { name: "8DHUBIFY 3D Animation", framesCount: totalFrames, fps: 12, color: activeColor },
+                    frames: framesData
+                };
+
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObj));
+                const link = document.createElement('a');
+                link.href = dataStr;
+                link.download = "8DHUBIFY_animation.json";
+                link.click();
+
+                loading.style.display = 'none';
+                loading.innerText = 'Processando...';
+                render(); 
+            }, 100);
+        }
+    </script>
+</body>
+</html>
